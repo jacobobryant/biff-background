@@ -1,7 +1,8 @@
 (ns com.biffweb.background-test
   (:require [chime.core :as chime]
             [clojure.test :refer [deftest is testing]]
-            [com.biffweb.background :as background])
+            [com.biffweb.background :as background]
+            [com.biffweb.fx :as biff.fx])
   (:import [java.util.concurrent PriorityBlockingQueue]))
 
 (deftest module-collects-task-and-queue-config
@@ -46,19 +47,44 @@
         ((first (:biff.core/stop ctx)))
         (is @closed?)))))
 
-(deftest queues-run-jobs-and-return-results
-  (let [seen (promise)
-        ctx (background/use-queues
-             {:biff.core/stop []
-              :biff.background/queues
-              {:default
-               {:consumer (fn [{:keys [biff.background/job]}]
-                            (deliver seen job)
-                            ((:biff.background/queue-callback job)
-                             (* 2 (:value job))))}}})]
-    (try
-      (is (= 42 @(background/submit-job-for-result ctx :default {:value 21})))
-      (is (= 21 (:value @seen)))
-      (finally
-        (run! #(%)
-              (:biff.core/stop ctx))))))
+(defn- queue-ctx [seen done]
+  (background/use-queues
+   {:biff.core/stop []
+    :biff.background/queues
+    {:default
+     {:consumer (fn [{:keys [biff.background/job]}]
+                  (let [jobs (swap! seen conj job)]
+                    (when (= 2 (count jobs))
+                      (deliver done jobs))))}}}))
+
+(deftest queues-run-jobs
+  (let [jobs [{:value 2 :biff/priority 2}
+              {:value 1 :biff/priority 1}]]
+    (testing "direct helper"
+      (let [seen (atom [])
+            done (promise)
+            ctx (queue-ctx seen done)]
+        (try
+          (is (= jobs
+                 (background/submit-jobs ctx :default jobs)))
+          (is (= (set jobs)
+                 (set @done)))
+          (finally
+            (run! #(%)
+                  (:biff.core/stop ctx))))))
+    (testing "biff.fx handler"
+      (let [seen (atom [])
+            done (promise)
+            ctx (queue-ctx seen done)]
+        (try
+          (is (= jobs
+                 (biff.fx/handle
+                  :biff.background/submit-jobs
+                  ctx
+                  :default
+                  jobs)))
+          (is (= (set jobs)
+                 (set @done)))
+          (finally
+            (run! #(%)
+                  (:biff.core/stop ctx))))))))

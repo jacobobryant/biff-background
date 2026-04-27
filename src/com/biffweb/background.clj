@@ -1,6 +1,7 @@
 (ns com.biffweb.background
   (:require [chime.core :as chime]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [com.biffweb.fx :as biff.fx])
   (:import [java.util.concurrent
             Callable
             Executors
@@ -106,39 +107,20 @@
               {}
               @modules-var)})})
 
-(defn submit-job [ctx queue-id job]
-  (if-some [queue (get-in ctx [:biff.background/queues queue-id])]
-    (.add queue job)
-    (throw (ex-info "Queue not found"
-                    {:biff.background/queue-id queue-id
-                     :biff.background/job job
-                     :biff.background/queue-ids (-> ctx
-                                                    :biff.background/queues
-                                                    keys
-                                                    vec)}))))
+(defn submit-jobs [ctx queue-id jobs]
+  (let [jobs (vec jobs)]
+    (if-some [queue (get-in ctx [:biff.background/queues queue-id])]
+      (do
+        (run! #(.add queue %) jobs)
+        jobs)
+      (throw (ex-info "Queue not found"
+                      {:biff.background/queue-id queue-id
+                       :biff.background/jobs jobs
+                       :biff.background/queue-ids (-> ctx
+                                                      :biff.background/queues
+                                                      keys
+                                                      vec)})))))
 
-(defn submit-job-for-result [{:keys [biff.background/queue-result-timeout]
-                              :or {queue-result-timeout 20000}
-                              :as ctx}
-                             queue-id
-                             job]
-  (let [p (promise)
-        result (if queue-result-timeout
-                 (delay (deref p queue-result-timeout ::timeout))
-                 p)]
-    (submit-job ctx
-                queue-id
-                (assoc job :biff.background/queue-callback #(deliver p %)))
-    (delay
-      (let [value @result]
-        (cond
-          (= value ::timeout)
-          (throw (ex-info "Timed out while waiting for job result"
-                          {:biff.background/queue-id queue-id
-                           :biff.background/job job}))
-
-          (instance? Throwable value)
-          (throw value)
-
-          :else
-          value)))))
+(defmethod biff.fx/handle :biff.background/submit-jobs
+  [_fx-key ctx queue-id jobs]
+  (submit-jobs ctx queue-id jobs))
