@@ -10,8 +10,8 @@
 
 (defn- default-queue []
   (PriorityBlockingQueue. 11 (fn [a b]
-                               (compare (:biff/priority a 10)
-                                        (:biff/priority b 10)))))
+                               (compare (:biff.background/priority a 10)
+                                        (:biff.background/priority b 10)))))
 
 (defn- scheduler-options [{:keys [error-handler on-finished]}]
   (cond-> {}

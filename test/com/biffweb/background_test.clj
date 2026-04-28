@@ -58,8 +58,8 @@
                       (deliver done jobs))))}}}))
 
 (deftest queues-run-jobs
-  (let [jobs [{:value 2 :biff/priority 2}
-              {:value 1 :biff/priority 1}]]
+  (let [jobs [{:value 2 :biff.background/priority 2}
+              {:value 1 :biff.background/priority 1}]]
     (testing "direct helper"
       (let [seen (atom [])
             done (promise)
