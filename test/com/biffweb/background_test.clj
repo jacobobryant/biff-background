@@ -78,8 +78,7 @@
             ctx (queue-ctx seen done)]
         (try
           (is (= jobs
-                 (biff.fx/handle
-                  :biff.background/submit-jobs
+                 ((:biff.background/submit-jobs background/fx-handlers)
                   ctx
                   :default
                   jobs)))
