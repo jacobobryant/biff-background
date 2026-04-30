@@ -121,6 +121,5 @@
                                                       keys
                                                       vec)})))))
 
-(defmethod biff.fx/handle :biff.background/submit-jobs
-  [_fx-key ctx queue-id jobs]
-  (submit-jobs ctx queue-id jobs))
+(def fx-handlers
+  {:biff.background/submit-jobs submit-jobs})
